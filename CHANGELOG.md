@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.2.2
+
+### MCP Schema Sanitization
+
+Tool parameter schemas now emit clean JSON Schema 2020-12 without non-standard extensions that caused warnings and rendering issues in MCP clients.
+
+**Fixed: Non-standard `format` values** — schemars emits `"format": "uint"`, `"uint32"`, `"float"`, `"double"` for Rust numeric types. These are not part of JSON Schema 2020-12 and caused Ajv validation warnings that corrupted TUI output in MCP clients. Added `strip_nonstandard_formats` transform applied at schema generation time via `#[schemars(transform = ...)]` on all 20 param structs. Only standard formats (date-time, email, uuid, etc.) are preserved.
+
+**Fixed: Unresolved `$ref`/`$defs`** — Nested enum and struct types (McpSearchIntent, SymbolKindFilter, BodyMode, SymbolRange, SourceAnchorInput, ImpactClaim, VerificationSignal) were emitted behind `$ref` pointers with `$defs` blocks. MCP clients (including OMP/Anthropic provider) extract only `properties` and `required` from schemas, dropping `$defs` entirely — leaving dangling `$ref` that LLMs see as opaque pointers. Added `#[schemars(inline)]` to all 7 types so they are inlined directly.
+
+**Improved: Tool descriptions for memory anchors** — `write_memory` and `update_memory` tool descriptions now explicitly list allowed `anchor_type` values (`file`, `symbol`, `pattern`) and `role` values (`primary`, `supporting`, `example`, `historical`) as defense-in-depth since no MCP client resolves `$ref`.
+
+### Embedding Coverage Reporting
+
+**Fixed: Stale `embedding_coverage` during reindex** — The `embedding_coverage` metric in the status endpoint stayed frozen at its pre-reindex value (e.g. 0.1546) throughout the entire embedding run because it was only recomputed from the database at job completion. Now `mark_file_embedded()` also refreshes the coverage estimate from in-memory counters (`(total_indexed - files_to_embed + files_embedded) / total_indexed`), so the status endpoint reflects real-time progress. The authoritative DB-backed computation still runs at job completion to reconcile.
+
 ## v0.2.1
 
 ### TypeScript/JavaScript Cross-File Reference Resolution
