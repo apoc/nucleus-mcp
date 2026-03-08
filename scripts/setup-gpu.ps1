@@ -16,9 +16,13 @@ param(
 $ErrorActionPreference = "Stop"
 $LibDir = if ($OutputDir) { $OutputDir } else { "$PSScriptRoot\..\target\release" }
 
-# ONNX Runtime version - must match the version used by fastembed/ort crate
-# Check NuGet for available versions: https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime.DirectML
-$ORT_VERSION = "1.23.0"
+# ONNX Runtime version - must match the version used by ort-sys crate
+# ort-sys 2.0.0-rc.12 wraps ORT 1.24; latest NuGet release is 1.24.3
+# Check NuGet: https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime.DirectML
+$ORT_VERSION = "1.24.3"
+# Intel's OpenVINO package releases independently and lags Microsoft's version
+# Check NuGet: https://www.nuget.org/packages/Intel.ML.OnnxRuntime.OpenVino
+$ORT_OPENVINO_VERSION = "1.24.1"
 
 function Download-File($url, $output) {
     Write-Host "Downloading $url..."
@@ -34,6 +38,10 @@ function Download-NuGetPackage($packageName, $version, $output) {
     Invoke-WebRequest -Uri $url -OutFile $zipOutput
     # Return the actual path (with .zip extension)
     return $zipOutput
+}
+
+function Remove-IfExists($path) {
+    if (Test-Path $path) { Remove-Item $path -Recurse -Force }
 }
 
 function Get-PyPiWheelUrl($packageName) {
@@ -75,10 +83,8 @@ function Setup-CUDA {
     Copy-Item "$srcDir\onnxruntime_providers_cuda.dll" $LibDir -Force
     Copy-Item "$srcDir\onnxruntime_providers_tensorrt.dll" $LibDir -Force -ErrorAction SilentlyContinue
 
-    # Cleanup temp files
-    Write-Host "Cleaning up temporary files..."
-    Remove-Item $zip -Force -ErrorAction SilentlyContinue
-    Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-IfExists $zip
+    Remove-IfExists $extractDir
 
     Write-Host ""
     if ($SystemCuda) {
@@ -112,14 +118,10 @@ function Setup-CudaRedist {
         Get-ChildItem -Path $extractPath -Filter "*.dll" -Recurse | ForEach-Object {
             Copy-Item $_.FullName $LibDir -Force
         }
-
-        # Cleanup
-        Remove-Item $zipFile -Force -ErrorAction SilentlyContinue
-        Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     # cuDNN 9.x from NVIDIA redist server
-    # Note: Using a fixed version known to be stable with ORT 1.23.0
+    # Note: Using a fixed version known to be stable with ORT 1.24.x
     $CudnnVersion = "9.19.0.56"
     $CudnnZip = "$TempDir\cudnn.zip"
     $CudnnExtract = "$TempDir\cudnn"
@@ -137,10 +139,6 @@ function Setup-CudaRedist {
         Copy-Item "$CudnnBinDir\*.dll" $LibDir -Force
     }
 
-    # Cleanup cuDNN
-    Remove-Item $CudnnZip -Force -ErrorAction SilentlyContinue
-    Remove-Item $CudnnExtract -Recurse -Force -ErrorAction SilentlyContinue
-
     # ZLib is often a dependency for cuDNN
     Write-Host "Adding ZLib dependency..."
     $ZLibUrl = "https://github.com/madler/zlib/releases/download/v1.3.1/zlib131.zip"
@@ -150,9 +148,15 @@ function Setup-CudaRedist {
     Expand-Archive -Path $ZLibZip -DestinationPath $ZLibExtract -Force
     Copy-Item "$ZLibExtract\zlib1.dll" $LibDir -Force -ErrorAction SilentlyContinue
 
-    # Cleanup ZLib
-    Remove-Item $ZLibZip -Force -ErrorAction SilentlyContinue
-    Remove-Item $ZLibExtract -Recurse -Force -ErrorAction SilentlyContinue
+    # Cleanup CUDA redist temp files
+    foreach ($pkg in $CudaPackages) {
+        Remove-IfExists "$TempDir\$pkg.zip"
+        Remove-IfExists "$TempDir\$pkg"
+    }
+    Remove-IfExists $CudnnZip
+    Remove-IfExists $CudnnExtract
+    Remove-IfExists $ZLibZip
+    Remove-IfExists $ZLibExtract
 }
 
 function Setup-DirectML {
@@ -174,10 +178,8 @@ function Setup-DirectML {
     Copy-Item "$srcDir\onnxruntime.dll" $LibDir -Force
     Copy-Item "$srcDir\onnxruntime_providers_shared.dll" $LibDir -Force
 
-    # Cleanup temp files
-    Write-Host "Cleaning up temporary files..."
-    Remove-Item $zip -Force -ErrorAction SilentlyContinue
-    Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-IfExists $zip
+    Remove-IfExists $extractDir
 
     Write-Host ""
     Write-Host "DirectML provider installed to $LibDir"
@@ -194,7 +196,7 @@ function Setup-OpenVINO {
     $zip = "$TempDir\ort-openvino.zip"
     $extractDir = "$TempDir\ort-openvino"
 
-    $zip = Download-NuGetPackage "Intel.ML.OnnxRuntime.OpenVino" $ORT_VERSION $zip
+    $zip = Download-NuGetPackage "Intel.ML.OnnxRuntime.OpenVino" $ORT_OPENVINO_VERSION $zip
 
     Write-Host "Extracting..."
     if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
@@ -205,10 +207,8 @@ function Setup-OpenVINO {
     # Copy ONNX Runtime with OpenVINO support
     Copy-Item "$srcDir\*.dll" $LibDir -Force
 
-    # Cleanup temp files
-    Write-Host "Cleaning up temporary files..."
-    Remove-Item $zip -Force -ErrorAction SilentlyContinue
-    Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-IfExists $zip
+    Remove-IfExists $extractDir
 
     Write-Host ""
     Write-Host "OpenVINO provider installed to $LibDir"

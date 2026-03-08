@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.3
+
+### C# Support
+
+C# cross-file reference resolution is now fully functional. `get_usages`, `get_dependency_graph`, and `resolve_symbol_at` now correctly resolve symbols across files in C# projects, including projects that use dotted directory naming conventions (e.g. `Zentra.API/`). Fully qualified generic type arguments (e.g. `MapHub<Zentra.API.Hubs.NotificationHub>`, `AddScoped<Ns.IService, Ns.Impl>`) are now extracted and resolved as references.
+
+### GPU Setup
+
+**Fixed: DirectML crash when DML provider is absent** — Server no longer crashes on startup when `onnxruntime_providers_dml.dll` is not installed. Falls back to CPU automatically with a warning. `NUCLEUS_EP=directml` behaves the same way.
+
+**Fixed: `setup-gpu.ps1` installs the correct ORT runtime** — The script now installs ORT 1.24.3, matching the bundled runtime. The previous version (1.23.0) caused a silent ABI mismatch that hung the server at session initialisation.
+
 ## v0.2.2
 
 ### MCP Schema Sanitization
