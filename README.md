@@ -137,6 +137,34 @@ claude mcp add nucleus C:\Tools\nucleus\nucleus-server
 
 > Replace `C:\Tools\nucleus\nucleus-server` with the actual path to your binary in all examples above.
 
+### 5. HTTP Mode (Multi-Client)
+
+By default, Nucleus communicates over stdio — each MCP client spawns its own server process, loading models into memory separately. In HTTP mode, a single Nucleus instance serves all clients. Models are loaded once, regardless of how many editors or agents connect.
+
+```bash
+nucleus-server --http
+```
+
+This starts an HTTP server on `http://127.0.0.1:4040/mcp` using the MCP Streamable HTTP transport. All clients connect to this one instance. You can work on multiple projects at the same time, and even open the same project from several windows or editors simultaneously — each project gets its own shared session (index, file watcher, vector store), so nothing gets duplicated or corrupted.
+
+Point your MCP clients at the running server instead of launching a binary:
+
+```json
+{
+  "mcpServers": {
+    "nucleus": {
+      "url": "http://127.0.0.1:4040/mcp"
+    }
+  }
+}
+```
+
+CLI flags:
+- `--http` -- Enable HTTP/SSE transport (default: stdio)
+- `--bind <addr>` -- Bind address (default: `127.0.0.1`)
+- `--port <port>` -- Listen port (default: `4040`)
+
+
 ## Available Tools
 
 ### Code Search & Navigation

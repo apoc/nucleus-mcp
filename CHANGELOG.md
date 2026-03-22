@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.0
+
+### HTTP/SSE Transport
+
+**New: `--http` mode** — `nucleus-server --http` listens on `127.0.0.1:4040/mcp` using the MCP Streamable HTTP protocol. Supports stateful sessions, SSE notifications, and concurrent multi-client access.
+
+**New: Shared project sessions** — Multiple clients connecting to the same root share a single project session (DB, file watcher, indexer, vector store). No duplicate reindexing or write contention.
+
+**New: Notification fan-out** — Indexing notifications delivered concurrently to all connected clients. Per-client opt-in via notify flag.
+
+**New: Model preloading** — HTTP mode downloads all models at startup, eliminating first-connect delays.
+
+### Dependencies
+
+- rmcp 1.2.0, lancedb 0.27.0 stable, lance-index/lance-linalg 3.0 from crates.io
+
 ## v0.2.3
 
 ### C# Support
